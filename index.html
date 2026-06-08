@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Avaliação de Portfólios v7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandAzul: '#1E3A8A',
+                        brandVerde: '#10B981',
+                        brandVerdeEscuro: '#047857',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <div id="telaLogin" class="flex-1 flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-lg border-t-4 border-brandAzul w-full max-w-md space-y-6">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-brandAzul">Área Restrita</h2>
+                <p class="text-sm text-gray-500 mt-1">Faça login para acessar o painel do avaliador</p>
+            </div>
+            
+            <form id="formLogin" onsubmit="realizarLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-mail do Administrador</label>
+                    <input type="email" id="loginEmail" required placeholder="admin@exemplo.com" class="w-full border p-2.5 rounded focus:outline-none focus:border-brandAzul">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha (Letras e Números)</label>
+                    <input type="password" id="loginSenha" required placeholder="••••••••" class="w-full border p-2.5 rounded focus:outline-none focus:border-brandAzul">
+                </div>
+                <button type="submit" id="btnEntrar" class="w-full bg-brandAzul hover:bg-blue-900 text-white p-3 rounded-lg font-bold transition shadow">
+                    Entrar no Sistema
+                </button>
+            </form>
+            <div id="erroLogin" class="text-red-600 text-sm font-medium text-center hidden"></div>
+        </div>
+    </div>
+
+
+    <div id="painelSistema" class="hidden flex-1 flex flex-col">
+        <header class="bg-brandAzul text-white p-4 shadow-md">
+            <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center justify-between w-full md:w-auto gap-4">
+                    <h1 class="text-xl font-bold">Gestão & Avaliação de Portfólios</h1>
+                    <button onclick="realizarLogout()" class="md:hidden text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-bold transition">Sair</button>
+                </div>
+                
+                <nav class="flex bg-blue-900 rounded-lg p-1 text-sm font-medium gap-1">
+                    <button onclick="alternarAba('cadastro')" id="btnAbaCadastro" class="px-4 py-2 rounded-md bg-white text-brandAzul shadow transition font-semibold">
+                        Cadastro e Importação
+                    </button>
+                    <button onclick="alternarAba('portfolio')" id="btnAbaPortfolio" class="px-4 py-2 rounded-md text-white hover:text-gray-200 transition">
+                        Avaliar Portfólio
+                    </button>
+                    <button onclick="alternarAba('info')" id="btnAbaInfo" class="px-4 py-2 rounded-md text-white hover:text-gray-200 transition">
+                        Informações das Rubricas
+                    </button>
+                </nav>
+                
+                <div class="hidden md:flex items-center gap-3">
+                    <span id="userLogado" class="text-xs text-gray-200 italic"></span>
+                    <button onclick="realizarLogout()" class="text-sm bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-bold transition">Sair</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4 md:p-6 space-y-6 flex-1">
+
+            <div id="conteudoCadastro" class="space-y-6">
+                <section class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow border-t-4 border-brandAzul">
+                        <h2 class="text-lg font-bold text-brandAzul mb-4">1. Gerenciar Turmas</h2>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="nomeTurma" placeholder="Ex: 3º Ano A - Informática" class="flex-1 border p-2 rounded focus:outline-none focus:border-brandAzul">
+                            <button onclick="criarTurma()" class="bg-brandAzul hover:bg-blue-900 text-white px-4 py-2 rounded font-medium transition">Criar Turma</button>
+                        </div>
+                        <label class="block text-sm font-medium mb-1">Selecionar Turma Ativa:</label>
+                        <select id="selectTurmaCadastro" onchange="sincronizarTurma('cadastro')" class="w-full border p-2 rounded focus:outline-none focus:border-brandAzul">
+                            <option value="">Selecione uma turma...</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg shadow border-t-4 border-brandVerde">
+                        <h2 class="text-lg font-bold text-brandVerdeEscuro mb-2">2. Importar Alunos (.CSV)</h2>
+                        <p class="text-xs text-gray-500 mb-4">Selecione a turma ao lado, depois envie um arquivo CSV contendo o nome de um aluno por linha.</p>
+                        <div class="space-y-3">
+                            <input type="file" id="arquivoCsv" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brandVerdeEscuro hover:file:bg-emerald-100">
+                            <button onclick="importarCSV()" class="w-full bg-brandVerde hover:bg-brandVerdeEscuro text-white px-4 py-2 rounded font-medium transition">Processar e Salvar Alunos</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-lg font-bold text-gray-700 mb-2">Alunos Cadastrados na Turma Selecionada</h2>
+                    <ul id="listaAlunosCadastro" class="divide-y divide-gray-200 max-h-60 overflow-y-auto">
+                        <li class="py-2 text-gray-500 italic">Selecione uma turma acima para listar os alunos.</li>
+                    </ul>
+                </section>
+            </div>
+
+
+            <div id="conteudoPortfolio" class="space-y-6 hidden">
+                <section class="bg-white p-6 rounded-lg shadow border-t-4 border-brandVerde">
+                    <div>
+                        <label class="block text-sm font-bold text-brandVerdeEscuro mb-1">Selecionar Turma para Portfólio:</label>
+                        <select id="selectTurmaPortfolio" onchange="sincronizarTurma('portfolio')" class="w-full border p-2 rounded focus:outline-none focus:border-brandVerde">
+                            <option value="">Selecione uma turma...</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow md:col-span-1">
+                        <h2 class="text-lg font-bold text-gray-700 mb-4">Alunos da Turma</h2>
+                        <ul id="listaAlunosPortfolio" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+                            <li class="py-2 text-gray-500 italic">Selecione uma turma para ver os alunos.</li>
+                        </ul>
+                    </div>
+
+                    <div id="painelPortfolio" class="bg-white p-6 rounded-lg shadow md:col-span-2 hidden border-l-4 border-brandVerde">
+                        <div class="border-b pb-3 mb-4 flex justify-between items-center">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-brandAzul">Avaliando Portfólio:</span>
+                                <h2 id="nomeAlunoPortfolio" class="text-xl font-bold text-brandVerdeEscuro">Selecione um aluno</h2>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs block text-gray-500 font-bold">NOTA DO PORTFÓLIO</span>
+                                <span id="notaTotalPortfolio" class="text-3xl font-black text-brandAzul">0.0</span><span class="text-gray-400 font-bold"> / 10</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <button onclick="exportarParaExcel()" class="w-full bg-brandVerde hover:bg-brandVerdeEscuro text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition shadow">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Baixar Planilha de Notas Atualizada (Portfólio)
+                            </button>
+                        </div>
+
+                        <form id="formRubricasPortfolio" onchange="calcularNota()" class="space-y-4 border-t pt-4">
+                            <div>
+                                <label class="block font-semibold text-sm text-gray-700">1. Organização do Portfólio (0 a 2.0 pts)</label>
+                                <input type="range" min="0" max="2" step="0.5" value="0" class="w-full accent-brandVerde" name="p1">
+                                <div class="flex justify-between text-xs text-gray-400 px-1"><span>0.0 (Desorganizado)</span><span>1.0 (Bom)</span><span>2.0 (Excelente)</span></div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-sm text-gray-700">2. Domínio do Conteúdo (0 a 2.0 pts)</label>
+                                <input type="range" min="0" max="2" step="0.5" value="0" class="w-full accent-brandVerde" name="p2">
+                                <div class="flex justify-between text-xs text-gray-400 px-1"><span>0.0 (Insuficiente)</span><span>1.0 (Regular)</span><span>2.0 (Total Domínio)</span></div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-sm text-gray-700">3. Reflexão sobre a Aprendizagem (0 a 2.0 pts)</label>
+                                <input type="range" min="0" max="2" step="0.5" value="0" class="w-full accent-brandVerde" name="p3">
+                                <div class="flex justify-between text-xs text-gray-400 px-1"><span>0.0 (Superficial)</span><span>1.0 (Adequada)</span><span>2.0 (Crítica e Profunda)</span></div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-sm text-gray-700">4. Comunicação Oral (0 a 2.0 pts)</label>
+                                <input type="range" min="0" max="2" step="0.5" value="0" class="w-full accent-brandVerde" name="p4">
+                                <div class="flex justify-between text-xs text-gray-400 px-1"><span>0.0 (Pouco Clara)</span><span>1.0 (Boa)</span><span>2.0 (Fluida e Segura)</span></div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-sm text-gray-700">5. Uso de Evidências e Recursos (0 a 2.0 pts)</label>
+                                <input type="range" min="0" max="2" step="0.5" value="0" class="w-full accent-brandVerde" name="p5">
+                                <div class="flex justify-between text-xs text-gray-400 px-1"><span>0.0 (Sem Evidências)</span><span>1.0 (Suficientes)</span><span>2.0 (Ricas e Variadas)</span></div>
+                            </div>
+                            <div class="pt-4">
+                                <button type="button" onclick="salvarAvaliacao()" class="w-full bg-brandAzul hover:bg-blue-900 text-white p-3 rounded-lg font-bold shadow transition">Gravar Nota do Portfólio</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+
+
+            <div id="conteudoInfo" class="space-y-6 hidden">
+                <section class="bg-white p-6 rounded-lg shadow border-t-4 border-brandAzul">
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-brandAzul">Diretrizes e Critérios para Avaliação do Portfólio</h2>
+                        <p class="text-sm text-gray-600">Utilize esta tabela como base e mapa referencial pedagógico durante o preenchimento dos níveis de cada aluno.</p>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left border-collapse border border-gray-200">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-700 border-b border-gray-200">
+                                    <th class="p-4 font-bold border-r border-gray-200 w-1/5">Critério</th>
+                                    <th class="p-4 font-bold text-brandVerdeEscuro border-r border-gray-200 w-1/5">2,0 pontos</th>
+                                    <th class="p-4 font-bold text-emerald-600 border-r border-gray-200 w-1/5">1,5 ponto</th>
+                                    <th class="p-4 font-bold text-amber-600 border-r border-gray-200 w-1/5">1,0 ponto</th>
+                                    <th class="p-4 font-bold text-red-600 w-1/5">0,5 ponto ou menos</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr>
+                                    <td class="p-4 font-semibold bg-gray-50 border-r">Organização do Portfólio</td>
+                                    <td class="p-4 border-r">Muito organizado, completo e fácil de acompanhar.</td>
+                                    <td class="p-4 border-r">Organizado, com poucas falhas.</td>
+                                    <td class="p-4 border-r">Organização parcial.</td>
+                                    <td class="p-4 text-gray-500">Desorganizado ou incompleto.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-semibold bg-gray-50 border-r">Domínio do Conteúdo</td>
+                                    <td class="p-4 border-r">Demonstra excelente conhecimento dos trabalhos apresentados.</td>
+                                    <td class="p-4 border-r">Demonstra bom conhecimento.</td>
+                                    <td class="p-4 border-r">Conhecimento básico.</td>
+                                    <td class="p-4 text-gray-500">Dificuldade para explicar os trabalhos.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-semibold bg-gray-50 border-r">Reflexão sobre a Aprendizagem</td>
+                                    <td class="p-4 border-r">Analisa claramente suas aprendizagens e desafios.</td>
+                                    <td class="p-4 border-r">Apresenta reflexões adequadas.</td>
+                                    <td class="p-4 border-r">Reflexões superficiais.</td>
+                                    <td class="p-4 text-gray-500">Não reflete sobre sua aprendizagem.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-semibold bg-gray-50 border-r">Comunicação Oral</td>
+                                    <td class="p-4 border-r">Fala com clareza, confiança e boa postura.</td>
+                                    <td class="p-4 border-r">Boa comunicação com pequenas dificuldades.</td>
+                                    <td class="p-4 border-r">Comunicação regular.</td>
+                                    <td class="p-4 text-gray-500">Comunicação pouco clara.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-semibold bg-gray-50 border-r">Uso de Evidências e Recursos</td>
+                                    <td class="p-4 border-r">Utiliza exemplos e registros relevantes para sustentar a apresentação.</td>
+                                    <td class="p-4 border-r">Utiliza alguns exemplos.</td>
+                                    <td class="p-4 border-r">Poucos exemplos ou evidências.</td>
+                                    <td class="p-4 text-gray-500">Não utiliza evidências.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // CREDENCIAIS DO SEU FIREBASE EXTRAÍDAS COM SUCESSO
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZojd5e_cuJjGW_ScSmJClvQu090Y6NoQ",
+            authDomain: "portfoliosesi.firebaseapp.com",
+            projectId: "portfoliosesi",
+            storageBucket: "portfoliosesi.firebasestorage.app",
+            messagingSenderId: "556583009081",
+            appId: "1:556583009081:web:3722db07d416b461ef46e8"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        let turmaIdAtual = "";
+        let alunoIdAtual = "";
+        let alunosCarregadosAtuais = [];
+        let abaAtiva = "cadastro";
+
+        // Monitor de Estado de Autenticação
+        auth.onAuthStateChanged(user => {
+            const telaLogin = document.getElementById('telaLogin');
+            const painelSistema = document.getElementById('painelSistema');
+            
+            if (user) {
+                telaLogin.classList.add('hidden');
+                painelSistema.classList.remove('hidden');
+                document.getElementById('userLogado').textContent = `Conectado como: ${user.email}`;
+                carregarTurmas();
+            } else {
+                telaLogin.classList.remove('hidden');
+                painelSistema.classList.add('hidden');
+                turmaIdAtual = "";
+                alunoIdAtual = "";
+                alunosCarregadosAtuais = [];
+            }
+        });
+
+        // Função de Login do Admin
+        async function realizarLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const senha = document.getElementById('loginSenha').value;
+            const erroDiv = document.getElementById('erroLogin');
+            const btn = document.getElementById('btnEntrar');
+            
+            erroDiv.classList.add('hidden');
+            btn.disabled = true;
+            btn.textContent = "Verificando...";
+
+            try {
+                await auth.signInWithEmailAndPassword(email, senha);
+                document.getElementById('formLogin').reset();
+            } catch (error) {
+                erroDiv.classList.remove('hidden');
+                erroDiv.textContent = "Usuário ou senha incorretos.";
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Entrar no Sistema";
+            }
+        }
+
+        function realizarLogout() {
+            auth.signOut();
+        }
+
+        function alternarAba(aba) {
+            abaAtiva = aba;
+            const btnCad = document.getElementById('btnAbaCadastro');
+            const btnPt = document.getElementById('btnAbaPortfolio');
+            const btnInf = document.getElementById('btnAbaInfo');
+            
+            const contCad = document.getElementById('conteudoCadastro');
+            const contPt = document.getElementById('conteudoPortfolio');
+            const contInf = document.getElementById('conteudoInfo');
+
+            btnCad.className = "px-4 py-2 rounded-md text-white hover:text-gray-200 transition";
+            btnPt.className = "px-4 py-2 rounded-md text-white hover:text-gray-200 transition";
+            btnInf.className = "px-4 py-2 rounded-md text-white hover:text-gray-200 transition";
+            
+            contCad.classList.add('hidden');
+            contPt.classList.add('hidden');
+            contInf.classList.add('hidden');
+
+            if (aba === 'cadastro') {
+                btnCad.className = "px-4 py-2 rounded-md bg-white text-brandAzul shadow transition font-semibold";
+                contCad.classList.remove('hidden');
+                document.getElementById('selectTurmaCadastro').value = turmaIdAtual;
+                carregarAlunosDoBanco('cadastro');
+            } else if (aba === 'portfolio') {
+                btnPt.className = "px-4 py-2 rounded-md bg-white text-brandVerdeEscuro shadow transition font-semibold";
+                contPt.classList.remove('hidden');
+                document.getElementById('selectTurmaPortfolio').value = turmaIdAtual;
+                carregarAlunosDoBanco('portfolio');
+            } else if (aba === 'info') {
+                btnInf.className = "px-4 py-2 rounded-md bg-white text-brandAzul shadow transition font-semibold";
+                contInf.classList.remove('hidden');
+            }
+        }
+
+        async function criarTurma() {
+            const nome = document.getElementById('nomeTurma').value.trim();
+            if (!nome) return alert('Digite o nome da turma!');
+            try {
+                await db.collection('turmas').add({ nome: nome, dataCriacao: firebase.firestore.FieldValue.serverTimestamp() });
+                document.getElementById('nomeTurma').value = '';
+                alert('Turma criada com sucesso!');
+            } catch (error) { console.error(error); }
+        }
+
+        function carregarTurmas() {
+            if(!auth.currentUser) return;
+
+            const selectCad = document.getElementById('selectTurmaCadastro');
+            const selectPt = document.getElementById('selectTurmaPortfolio');
+            
+            db.collection('turmas').orderBy('nome').onSnapshot(snapshot => {
+                if(!auth.currentUser) return;
+                const optionsHTML = ['<option value="">Selecione uma turma...</option>'];
+                snapshot.forEach(doc => {
+                    optionsHTML.push(`<option value="${doc.id}">${doc.data().nome}</option>`);
+                });
+                selectCad.innerHTML = optionsHTML.join('');
+                selectPt.innerHTML = optionsHTML.join('');
+                
+                if(turmaIdAtual) {
+                    selectCad.value = turmaIdAtual;
+                    selectPt.value = turmaIdAtual;
+                }
+            });
+        }
+
+        function sincronizarTurma(origem) {
+            turmaIdAtual = document.getElementById(origem === 'cadastro' ? 'selectTurmaCadastro' : 'selectTurmaPortfolio').value;
+            document.getElementById('selectTurmaCadastro').value = turmaIdAtual;
+            document.getElementById('selectTurmaPortfolio').value = turmaIdAtual;
+            carregarAlunosDoBanco(origem);
+        }
+
+        function carregarAlunosDoBanco(contexto) {
+            const listaCadastro = document.getElementById('listaAlunosCadastro');
+            const listaPortfolio = document.getElementById('listaAlunosPortfolio');
+            const painelPt = document.getElementById('painelPortfolio');
+            
+            if (contexto === 'portfolio') painelPt.classList.add('hidden');
+
+            if (!turmaIdAtual) {
+                listaCadastro.innerHTML = '<li class="py-2 text-gray-500 italic">Selecione uma turma acima para listar os alunos.</li>';
+                listaPortfolio.innerHTML = '<li class="py-2 text-gray-500 italic">Selecione uma turma para ver os alunos.</li>';
+                alunosCarregadosAtuais = [];
+                return;
+            }
+
+            db.collection('turmas').doc(turmaIdAtual).collection('alunos').orderBy('nome')
+                .onSnapshot(snapshot => {
+                    if(!auth.currentUser) return;
+                    listaCadastro.innerHTML = '';
+                    listaPortfolio.innerHTML = '';
+                    alunosCarregadosAtuais = [];
+                    
+                    if (snapshot.empty) {
+                        listaCadastro.innerHTML = '<li class="py-2 text-gray-500 italic">Nenhum aluno cadastrado nesta turma.</li>';
+                        listaPortfolio.innerHTML = '<li class="py-2 text-gray-500 italic">Nenhum aluno nesta turma.</li>';
+                        return;
+                    }
+                    
+                    if(contexto === 'portfolio') painelPt.classList.remove('hidden');
+
+                    snapshot.forEach(doc => {
+                        const dados = doc.data();
+                        dados.id = doc.id;
+                        alunosCarregadosAtuais.push(dados);
+
+                        const liCad = document.createElement('li');
+                        liCad.className = "py-2 text-gray-700";
+                        liCad.textContent = dados.nome;
+                        listaCadastro.appendChild(liCad);
+
+                        let notaExibida = '(Pendente)';
+                        let corNota = 'text-gray-400';
+                        if (dados.notaPortfolio !== undefined) {
+                            notaExibida = `(Portfólio: ${dados.notaPortfolio.toFixed(1)})`;
+                            corNota = 'text-brandAzul font-bold';
+                        }
+
+                        const liPt = document.createElement('li');
+                        liPt.className = "py-3 px-2 hover:bg-gray-100 cursor-pointer rounded flex justify-between items-center transition";
+                        liPt.innerHTML = `<span>${dados.nome}</span> <span class="text-sm ${corNota}">${notaExibida}</span>`;
+                        liPt.onclick = () => iniciarAvaliacao(doc.id, dados.nome, dados);
+                        listaPortfolio.appendChild(liPt);
+                    });
+                });
+        }
+
+        function iniciarAvaliacao(id, nome, dados) {
+            alunoIdAtual = id;
+            document.getElementById('nomeAlunoPortfolio').textContent = nome;
+            
+            const form = document.getElementById('formRubricasPortfolio');
+            form.p1.value = dados.p1 || 0;
+            form.p2.value = dados.p2 || 0;
+            form.p3.value = dados.p3 || 0;
+            form.p4.value = dados.p4 || 0;
+            form.p5.value = dados.p5 || 0;
+            
+            calcularNota();
+        }
+
+        function calcularNota() {
+            const form = document.getElementById('formRubricasPortfolio');
+            const total = parseFloat(form.p1.value) + parseFloat(form.p2.value) + parseFloat(form.p3.value) + parseFloat(form.p4.value) + parseFloat(form.p5.value);
+            document.getElementById('notaTotalPortfolio').textContent = total.toFixed(1);
+        }
+
+        async function salvarAvaliacao() {
+            if (!turmaIdAtual || !alunoIdAtual) return;
+            
+            const form = document.getElementById('formRubricasPortfolio');
+            const p1 = parseFloat(form.p1.value);
+            const p2 = parseFloat(form.p2.value);
+            const p3 = parseFloat(form.p3.value);
+            const p4 = parseFloat(form.p4.value);
+            const p5 = parseFloat(form.p5.value);
+            const dadosUpdate = { p1, p2, p3, p4, p5, notaPortfolio: (p1 + p2 + p3 + p4 + p5) };
+
+            try {
+                await db.collection('turmas').doc(turmaIdAtual).collection('alunos').doc(alunoIdAtual).update(dadosUpdate);
+                alert('Avaliação gravada com sucesso!');
+            } catch (error) { alert('Erro ao salvar dados.'); }
+        }
+
+        // Importação nativa via FileReader (processa linha por linha do CSV)
+        function importarCSV() {
+            if (!turmaIdAtual) return alert('Selecione uma turma primeiro.');
+            const fileInput = document.getElementById('arquivoCsv');
+            if (fileInput.files.length === 0) return alert('Selecione um arquivo .csv.');
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const texto = e.target.result;
+                const linhas = texto.split(/\r?\n/);
+                const batch = db.batch();
+                let contagem = 0;
+
+                linhas.forEach(linha => {
+                    const nomeAluno = linha.trim();
+                    if (nomeAluno) {
+                        const novoAlunoRef = db.collection('turmas').doc(turmaIdAtual).collection('alunos').doc();
+                        batch.set(novoAlunoRef, { nome: nomeAluno });
+                        contagem++;
+                    }
+                });
+
+                if(contagem > 0) {
+                    batch.commit().then(() => {
+                        alert(`${contagem} alunos cadastrados!`);
+                        fileInput.value = '';
+                    });
+                }
+            };
+            reader.readAsText(file, "UTF-8");
+        }
+
+        function exportarParaExcel() {
+            if (alunosCarregadosAtuais.length === 0) return alert('Não há dados para exportar.');
+
+            const select = document.getElementById('selectTurmaPortfolio');
+            const nomeDaTurma = select.options[select.selectedIndex].text;
+            
+            const dadosExcel = alunosCarregadosAtuais.map(aluno => ({
+                "Nome do Aluno": aluno.nome,
+                "Portf - Organização (0-2)": aluno.p1 !== undefined ? aluno.p1 : "Pendente",
+                "Portf - Domínio (0-2)": aluno.p2 !== undefined ? aluno.p2 : "Pendente",
+                "Portf - Reflexão (0-2)": aluno.p3 !== undefined ? aluno.p3 : "Pendente",
+                "Portf - Oralidade (0-2)": aluno.p4 !== undefined ? aluno.p4 : "Pendente",
+                "Portf - Evidências (0-2)": aluno.p5 !== undefined ? aluno.p5 : "Pendente",
+                "Nota Portfólio (0-10)": aluno.notaPortfolio !== undefined ? aluno.notaPortfolio : "Pendente"
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(dadosExcel);
+            XLSX.utils.book_append_sheet(wb, ws, "Notas Portfólio");
+
+            const nomeArquivo = `Notas_Portfolio_${nomeDaTurma.replace(/[/\\?%*:|"<> ]/g, '_')}.xlsx`;
+            XLSX.writeFile(wb, nomeArquivo);
+        }
+    </script>
+</body>
+</html>
