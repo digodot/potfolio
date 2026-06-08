@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Avaliação de Portfólios v7.1</title>
+    <title>Sistema de Avaliação de Portfólios v8.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
@@ -78,19 +78,28 @@
 
             <div id="conteudoCadastro" class="space-y-6">
                 <section class="grid md:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-lg shadow border-t-4 border-brandAzul flex flex-col justify-between">
+                    <div class="bg-white p-6 rounded-lg shadow border-t-4 border-brandAzul flex flex-col justify-between space-y-4">
                         <div>
-                            <h2 class="text-lg font-bold text-brandAzul mb-4">1. Gerenciar Turmas</h2>
-                            <div class="flex gap-2 mb-6">
+                            <h2 class="text-lg font-bold text-brandAzul mb-3">1. Gerenciar Turmas</h2>
+                            <div class="flex gap-2">
                                 <input type="text" id="nomeTurma" placeholder="Ex: 3º Ano A - Informática" class="flex-1 border p-2 rounded focus:outline-none focus:border-brandAzul">
                                 <button onclick="criarTurma()" class="bg-brandAzul hover:bg-blue-900 text-white px-4 py-2 rounded font-medium transition">Criar Turma</button>
                             </div>
                         </div>
-                        <div>
+                        
+                        <div class="border-t pt-4">
                             <label class="block text-sm font-bold text-gray-700 mb-1">Selecionar Turma Ativa:</label>
-                            <select id="selectTurmaCadastro" onchange="sincronizarTurma('cadastro')" class="w-full border p-2.5 rounded focus:outline-none focus:border-brandAzul bg-gray-50 font-medium text-brandAzul">
-                                <option value="">Selecione uma turma...</option>
-                            </select>
+                            <div class="flex gap-2">
+                                <select id="selectTurmaCadastro" onchange="sincronizarTurma('cadastro')" class="flex-1 border p-2.5 rounded focus:outline-none focus:border-brandAzul bg-gray-50 font-medium text-brandAzul">
+                                    <option value="">Selecione uma turma...</option>
+                                </select>
+                                <button onclick="editarTurmaAtual()" title="Editar nome da turma" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded transition">
+                                    ✏️
+                                </button>
+                                <button onclick="excluirTurmaAtual()" title="Excluir turma inteira" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition">
+                                    🗑️
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -233,7 +242,7 @@
                                 </tr>
                                 <tr>
                                     <td class="p-4 font-semibold bg-gray-50 border-r">Reflexão sobre a Aprendizagem</td>
-                                    <td class="p-4 border-r">Analisa claramente suas aprendizagens e desafios.</td>
+                                    <td class="p-4 border-r">Analisa claramente suas aprendizagens and desafios.</td>
                                     <td class="p-4 border-r">Apresenta reflexões adequadas.</td>
                                     <td class="p-4 border-r">Reflexões superficiais.</td>
                                     <td class="p-4 text-gray-500">Não reflete sobre sua aprendizagem.</td>
@@ -373,6 +382,37 @@
             } catch (error) { console.error(error); }
         }
 
+        // EDITAR TURMA
+        async function editarTurmaAtual() {
+            if(!turmaIdAtual) return alert("Selecione uma turma ativa primeiro para editar.");
+            const select = document.getElementById('selectTurmaCadastro');
+            const nomeAntigo = select.options[select.selectedIndex].text;
+            
+            const novoNome = prompt("Digite o novo nome para a turma:", nomeAntigo);
+            if(!novoNome || novoNome.trim() === "" || novoNome.trim() === nomeAntigo) return;
+
+            try {
+                await db.collection('turmas').doc(turmaIdAtual).update({ nome: novoNome.trim() });
+                alert("Nome da turma atualizado!");
+            } catch(error) { console.error(error); alert("Erro ao editar turma."); }
+        }
+
+        // EXCLUIR TURMA
+        async function excluirTurmaAtual() {
+            if(!turmaIdAtual) return alert("Selecione uma turma ativa primeiro para excluir.");
+            const select = document.getElementById('selectTurmaCadastro');
+            const nomeTurma = select.options[select.selectedIndex].text;
+
+            if(!confirm(`Tem certeza absoluta de que deseja excluir a turma "${nomeTurma}"? Todos os alunos associados a ela também serão excluídos!`)) return;
+
+            try {
+                await db.collection('turmas').doc(turmaIdAtual).delete();
+                alert("Turma excluída com sucesso.");
+                turmaIdAtual = "";
+                sincronizarTurma('cadastro');
+            } catch(error) { console.error(error); alert("Erro ao excluir turma."); }
+        }
+
         function carregarTurmas() {
             if(!auth.currentUser) return;
 
@@ -436,9 +476,16 @@
                         dados.id = doc.id;
                         alunosCarregadosAtuais.push(dados);
 
+                        // Layout da Aba de Cadastro com botões Editar/Excluir Aluno
                         const liCad = document.createElement('li');
-                        liCad.className = "py-2 text-gray-700";
-                        liCad.textContent = dados.nome;
+                        liCad.className = "py-2 flex justify-between items-center text-gray-700";
+                        liCad.innerHTML = `
+                            <span>${dados.nome}</span>
+                            <div class="flex gap-2">
+                                <button onclick="editarAluno('${doc.id}', '${dados.nome}')" title="Editar nome" class="text-xs bg-gray-100 hover:bg-amber-100 px-2 py-1 rounded text-amber-600 transition">✏️ Editar</button>
+                                <button onclick="excluirAluno('${doc.id}', '${dados.nome}')" title="Excluir aluno" class="text-xs bg-gray-100 hover:bg-red-100 px-2 py-1 rounded text-red-600 transition">🗑️ Excluir</button>
+                            </div>
+                        `;
                         listaCadastro.appendChild(liCad);
 
                         let notaExibida = '(Pendente)';
@@ -457,7 +504,30 @@
                 });
         }
 
-        // Nova Função: Adicionar aluno manualmente no banco
+        // EDITAR ALUNO
+        async function editarAluno(idAluno, nomeAntigo) {
+            const novoNome = prompt("Digite o nome correto do aluno:", nomeAntigo);
+            if(!novoNome || novoNome.trim() === "" || novoNome.trim() === nomeAntigo) return;
+
+            try {
+                await db.collection('turmas').doc(turmaIdAtual).collection('alunos').doc(idAluno).update({
+                    nome: novoNome.trim()
+                });
+            } catch(error) { console.error(error); alert("Erro ao editar aluno."); }
+        }
+
+        // EXCLUIR ALUNO
+        async function excluirAluno(idAluno, nomeAluno) {
+            if(!confirm(`Excluir permanentemente o aluno "${nomeAluno}"?`)) return;
+
+            try {
+                await db.collection('turmas').doc(turmaIdAtual).collection('alunos').doc(idAluno).delete();
+                if(alunoIdAtual === idAluno) {
+                    document.getElementById('painelPortfolio').classList.add('hidden');
+                }
+            } catch(error) { console.error(error); alert("Erro ao excluir aluno."); }
+        }
+
         async function adicionarAlunoManual() {
             if (!turmaIdAtual) return alert('Selecione uma turma ativa primeiro!');
             
@@ -470,8 +540,7 @@
                 await db.collection('turmas').doc(turmaIdAtual).collection('alunos').add({
                     nome: nomeAluno
                 });
-                alert('Aluno adicionado com sucesso!');
-                inputNome.value = ''; // Limpa o campo
+                inputNome.value = '';
             } catch (error) {
                 console.error("Erro ao adicionar aluno: ", error);
                 alert('Erro ao tentar salvar o aluno.');
@@ -529,7 +598,7 @@
                 let contagem = 0;
 
                 linhas.forEach(linha => {
-                    const nomeAluno = linha.trim();
+                    const nomeAluno = inline = linha.trim();
                     if (nomeAluno) {
                         const novoAlunoRef = db.collection('turmas').doc(turmaIdAtual).collection('alunos').doc();
                         batch.set(novoAlunoRef, { nome: nomeAluno });
